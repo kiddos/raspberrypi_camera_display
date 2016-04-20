@@ -9,7 +9,8 @@ import socket
 cmd_port = 3001
 name_port = 3002
 data_port = 3003
-host = '140.127.205.169'
+# host = '140.127.205.169'
+host = '192.168.0.109'
 
 timeout = 0.066
 display_size = (320, 240)
@@ -17,11 +18,11 @@ display_size = (320, 240)
 
 class Application(Tkinter.Frame):
     def create_widgets(self):
-        self.quit = Tkinter.Button(self)
-        self.quit['text'] = 'QUIT'
-        self.quit['fg'] = 'red'
-        self.quit['command'] = self.quit
-        self.quit.pack({'side': 'left'})
+        self.quit_button = Tkinter.Button(self)
+        self.quit_button['text'] = 'QUIT'
+        self.quit_button['fg'] = 'red'
+        self.quit_button['command'] = self.quit
+        self.quit_button.pack({'side': 'left'})
 
         self.name_entry = Tkinter.Entry(self)
         self.name_entry.config(width=20)
@@ -40,6 +41,8 @@ class Application(Tkinter.Frame):
 
     def take_picture(self):
         print 'taking picture'
+        self.capture_image()
+
         name = self.name_entry.get()
         if len(name) > 0:
             print 'sending data...'
@@ -50,53 +53,72 @@ class Application(Tkinter.Frame):
             print name
             name_socket.send(name)
 
-            # send image data over
-            data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            data_socket.connect((host, data_port))
 
             self.stream.seek(0)
             image_data = self.stream.getvalue()
             print 'sending image data size: ', len(image_data)
-            data_socket.sendall(image_data)
-            data_socket.close()
+
+            # sending image size
+            data_socket.send(str(len(image_data)))
+            # sending data
+            data_socket.send(image_data)
+            # buf = self.stream.read(512)
+            # while len(buf) > 0:
+                # data_socket.send(buf)
+                # buf = self.stream.read(512)
+
             print 'data sent.'
 
-    def update_display(self):
-        with picamera.PiCamera() as camera:
-            self.stream = io.BytesIO()
+    def capture_image(self):
+        self.stream = io.BytesIO()
 
-            # capture data
-            camera.capture(self.stream, format='jpeg')
-            # move to front
-            self.stream.seek(0)
+        # capture data
+        camera.capture(self.stream, format='jpeg')
+        # move to front
+        self.stream.seek(0)
 
-            # display image
-            img = Image.open(self.stream)
-            img = img.resize(display_size, Image.ANTIALIAS)
-            self.image = ImageTk.PhotoImage(img)
-            self.display.config(image=self.image)
-            self.display.image = self.image
-
-        root.after(66, self.update_display)
-
+        # display image
+        img = Image.open(self.stream)
+        img = img.resize(display_size, Image.ANTIALIAS)
+        self.image = ImageTk.PhotoImage(img)
+        self.display.config(image=self.image)
+        self.display.image = self.image
 
     def __init__(self, master=Tkinter.NONE):
         Tkinter.Frame.__init__(self, master)
         self.pack()
         self.create_widgets()
-        self.update_display()
         self.mainloop()
 
+
+### main ###
+# init sockets
+data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 cmd_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 name_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+data_socket.connect((host, data_port))
 cmd_socket.connect((host, cmd_port))
 name_socket.connect((host, name_port))
-print 'connected'
+print 'all ports connected'
+
+# start camera
+camera = picamera.PiCamera()
+camera.preview_fullscreen = False
+camera.preview_window = (620, 320, 640, 480)
+camera.resolution = (640, 480)
+camera.sharpness = 10
+camera.contrast = 30
+camera.start_preview()
 
 root = Tkinter.Tk()
 app = Application(master=root)
 
-root.destroy()
-name_socket.close()
 
+root.destroy()
+
+name_socket.close()
+cmd_socket.close()
+data_socket.close()
+
+camera.stop_preview()
