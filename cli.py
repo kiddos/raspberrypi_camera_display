@@ -61,13 +61,14 @@ class Application(Tkinter.Frame):
             # sending image size
             data_socket.send(str(len(image_data)))
             # sending data
-            data_socket.send(image_data)
-            # buf = self.stream.read(512)
-            # while len(buf) > 0:
-                # data_socket.send(buf)
-                # buf = self.stream.read(512)
+            # data_socket.send(image_data)
+            buf = self.stream.read(512)
+            while len(buf) > 0:
+                data_socket.send(buf)
+                buf = self.stream.read(512)
 
             print 'data sent.'
+        time.sleep(2)
 
     def capture_image(self):
         self.stream = io.BytesIO()
